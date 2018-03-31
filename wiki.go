@@ -66,7 +66,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 /* editHandler
   - template.ParseFiles will read the contents of edit.html and return
     a *template.Template
-  - t.Execute executes a template, writing the generated HTML to the http.ResponseWrite
+  - t.Execute executes a template, writing the generated HTML to the http.ResponseWriter
   - .Title and .Body dotted identifiers refer to p.Title and p.Body
   - Template directives are enclosed in double curly braces in html {{ .Title }}
   - printf "%s" .Body instruction in html is a function call that outputs
@@ -86,6 +86,17 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
   t.Execute(w,p)
 }
 
+
+/* Save a page */
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+  title := r.URL.Path[len("/save/"):]
+  body := r.FormValue("body")
+  p := &Page{Title: title, Body: []byte(body)}
+  p.save()
+  http.Redirect(w, r, "/view/"+title, http.StatusFound)
+}
+
+
 /* Main */
 func main() {
 
@@ -99,7 +110,7 @@ func main() {
   // localhost:8080/view/[filename]
   http.HandleFunc("/view/", viewHandler)
   http.HandleFunc("/edit/", editHandler)
-  // http.Handlefunc("/save/", saveHandler)
+  http.HandleFunc("/save/", saveHandler)
   log.Fatal(http.ListenAndServe(":8080", nil))
 
 }
