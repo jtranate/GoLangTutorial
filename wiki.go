@@ -80,18 +80,25 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
   renderTemplate(w, "edit", p)
 }
 
+/* Gloabl templates variable
+  - Call ParseFiles once at program initialization, parsing all templates into a single *Template
+  - Then can use ExecuteTemplate method to render a specific template
+  - Must is a convenience wrapper that panics when passed a non-nil error value, otherwise returns the *Template unaltered
+    - Panic is appropriate here if template can't be loaded, so it will exit the program
+  - ParseFiles can take any number of strings
+*/
+var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
+
+
+
 /* Render Template
   - Handles errors
 */
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
-  t, err := template.ParseFiles(tmpl + ".html")
+  err := templates.ExecuteTemplate(w, tmpl + ".html", p)
   if err != nil {
     http.Error(w, err.Error(), http.StatusInternalServerError)
     return
-  }
-  err = t.Execute(w,p)
-  if err != nil {
-    http.Error(w, err.Error(), http.StatusInternalServerError)
   }
 }
 
@@ -118,6 +125,7 @@ func main() {
   // p1.save()
   // p2, _ := loadPage("TestPage")
   // fmt.Println(string(p2.Body))
+
 
   // Handler
   // localhost:8080/view/[filename]
