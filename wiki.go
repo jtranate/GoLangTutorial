@@ -1,7 +1,7 @@
 package main
 
 import (
-    "fmt"
+    "html/template" // to keep html in separate file
     "io/ioutil"
     "log"
     "net/http"
@@ -56,24 +56,31 @@ func loadPage(title string) (*Page, error) {
 func viewHandler(w http.ResponseWriter, r *http.Request) {
   title := r.URL.Path[len("/view/"):]
   p, _ := loadPage(title)
-  fmt.Fprintf(w, "<h1>%s</h1><div>%s</div>", p.Title, p.Body)
+  renderTemplate(w, "view", p)
 }
 
-/* editHandler */
+/* editHandler
+  - template.ParseFiles will read the contents of edit.html and return
+    a *template.Template
+  - t.Execute executes a template, writing the generated HTML to the http.ResponseWrite
+  - .Title and .Body dotted identifiers refer to p.Title and p.Body
+  - Template directives are enclosed in double curly braces in html {{ .Title }}
+  - printf "%s" .Body instruction in html is a function call that outputs
+*/
 func editHandler(w http.ResponseWriter, r *http.Request) {
   title := r.URL.Path[len("/edit/"):]
   p, err := loadPage(title)
   if err != nil {
     p = &Page{Title: title}
   }
-  fmt.Fprintf(w, "<h1>Editing %s</h1>" +
-    "<form action=\"/save/%s\" method=\"POST\">" +
-    "<textarea name=\"body\">%s</textarea><br>"+
-    "<input type=\"submit\" value=\"Save\">" +
-    "</form>",
-    p.Title, p.Title, p.Body)
+  renderTemplate(w, "edit", p)
 }
 
+/* Render Template */
+func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
+  t, _ := template.ParseFiles(tmpl + ".html")
+  t.Execute(w,p)
+}
 
 /* Main */
 func main() {
