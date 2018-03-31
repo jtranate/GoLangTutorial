@@ -5,7 +5,10 @@ import (
     "io/ioutil"
     "log"
     "net/http"
+    "regexp"
+    "errors" // To create new errors
 )
+
 
 /* Page Data Structure
   Two fields, Title and Body
@@ -54,7 +57,10 @@ func loadPage(title string) (*Page, error) {
   - Writes it to w, the http.ResponseWriter
 */
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-  title := r.URL.Path[len("/view/"):]
+  title, err := getTitle(w, r)
+  if err != nil {
+    return
+  }
   p, err := loadPage(title)
   if err != nil {
     http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -72,13 +78,34 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
   - printf "%s" .Body instruction in html is a function call that outputs
 */
 func editHandler(w http.ResponseWriter, r *http.Request) {
-  title := r.URL.Path[len("/edit/"):]
+  title, err := getTitle(w, r)
+  if err != nil {
+    return
+  }
   p, err := loadPage(title)
   if err != nil {
     p = &Page{Title: title}
   }
   renderTemplate(w, "edit", p)
 }
+
+/* Save a page */
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+  title, err := getTitle(w, r)
+  if err != nil {
+    return
+  }
+  body := r.FormValue("body")
+  p := &Page{Title: title, Body: []byte(body)}
+  err = p.save()
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusInternalServerError)
+    return
+  }
+  http.Redirect(w, r, "/view/"+title, http.StatusFound)
+}
+
+
 
 /* Gloabl templates variable
   - Call ParseFiles once at program initialization, parsing all templates into a single *Template
@@ -102,18 +129,22 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
   }
 }
 
+/* Validate title with regular expression
+  - regexp.MustCompile will parse and compile the regex and return a
+    regexp.Regexp.Mustcompile is distinct from Compile in that it will panic if expression
+    compilation fails, while Compile returns an error as a second parameter.
+*/
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
 
-/* Save a page */
-func saveHandler(w http.ResponseWriter, r *http.Request) {
-  title := r.URL.Path[len("/save/"):]
-  body := r.FormValue("body")
-  p := &Page{Title: title, Body: []byte(body)}
-  err := p.save()
-  if err != nil {
-    http.Error(w, err.Error(), http.StatusInternalServerError)
-    return
+
+/* Function to validate path and extract the page title */
+func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+  m := validPath.FindStringSubmatch(r.URL.Path)
+  if m == nil {
+    http.NotFound(w,r)
+    return "", errors.New("Invalid Page Title")
   }
-  http.Redirect(w, r, "/view/"+title, http.StatusFound)
+  return m[2], nil // The title is the second subexpression
 }
 
 
