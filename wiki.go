@@ -6,7 +6,7 @@ import (
     "log"
     "net/http"
     "regexp"
-    "errors" // To create new errors
+    // "errors" // To create new errors
 )
 
 
@@ -56,11 +56,7 @@ func loadPage(title string) (*Page, error) {
   - Loads the page data, formats the page with a string of simple HTML
   - Writes it to w, the http.ResponseWriter
 */
-func viewHandler(w http.ResponseWriter, r *http.Request) {
-  title, err := getTitle(w, r)
-  if err != nil {
-    return
-  }
+func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
   p, err := loadPage(title)
   if err != nil {
     http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -77,11 +73,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
   - Template directives are enclosed in double curly braces in html {{ .Title }}
   - printf "%s" .Body instruction in html is a function call that outputs
 */
-func editHandler(w http.ResponseWriter, r *http.Request) {
-  title, err := getTitle(w, r)
-  if err != nil {
-    return
-  }
+func editHandler(w http.ResponseWriter, r *http.Request, title string) {
   p, err := loadPage(title)
   if err != nil {
     p = &Page{Title: title}
@@ -90,14 +82,10 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 /* Save a page */
-func saveHandler(w http.ResponseWriter, r *http.Request) {
-  title, err := getTitle(w, r)
-  if err != nil {
-    return
-  }
+func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
   body := r.FormValue("body")
   p := &Page{Title: title, Body: []byte(body)}
-  err = p.save()
+  err := p.save()
   if err != nil {
     http.Error(w, err.Error(), http.StatusInternalServerError)
     return
@@ -136,17 +124,37 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
 */
 var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
 
-
+// Don't need because we added makeHandler
 /* Function to validate path and extract the page title */
-func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+/* func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
   m := validPath.FindStringSubmatch(r.URL.Path)
   if m == nil {
     http.NotFound(w,r)
     return "", errors.New("Invalid Page Title")
   }
   return m[2], nil // The title is the second subexpression
-}
+ } */
 
+/* Wrapper function that takes a function and returns a function of type http.HandlerFunc
+  - returned function called a closure bc it encloses values defined outside of it
+  - the variable fn is enclosed by the closure
+  - fn will be one of our save, edit, or view handlers
+  - Closure extracts the title from the request path and validates it with the TitleValidator regexp
+    - if invalid, error will be written to the ResponseWriter using the http.NotFound function
+    - if valid, enclosed handler function fn will be called with the ResponseWriter, Request, and title as arguments
+
+*/
+func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
+  return func(w http.ResponseWriter, r *http.Request) {
+    // Here we will extract the page title from the Request and call the provided handler 'fn'
+    m := validPath.FindStringSubmatch(r.URL.Path)
+    if m == nil {
+      http.NotFound(w, r)
+      return
+    }
+    fn(w, r, m[2])
+  }
+}
 
 /* Main */
 func main() {
@@ -160,9 +168,9 @@ func main() {
 
   // Handler
   // localhost:8080/view/[filename]
-  http.HandleFunc("/view/", viewHandler)
-  http.HandleFunc("/edit/", editHandler)
-  http.HandleFunc("/save/", saveHandler)
+  http.HandleFunc("/view/", makeHandler(viewHandler))
+  http.HandleFunc("/edit/", makeHandler(editHandler))
+  http.HandleFunc("/save/", makeHandler(saveHandler))
   log.Fatal(http.ListenAndServe(":8080", nil))
 
 }
