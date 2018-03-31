@@ -6,7 +6,7 @@ import (
     "log"
     "net/http"
     "regexp"
-    // "errors" // To create new errors
+    "errors" // To create new errors
 )
 
 
@@ -30,7 +30,7 @@ type Page struct {
   - 0600 is passed to Writefile to indicate the file should be created with r/w permissions for the current user
 */
 func (p *Page) save() error{
-  filename := p.Title + ".txt"
+  filename := "data/" + p.Title + ".txt"
   return ioutil.WriteFile(filename, p.Body, 0600)
 }
 
@@ -94,6 +94,10 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 
+func rootHandler(w http.ResponseWriter, r *http.Request){
+  http.Redirect(w, r, "/view/FrontPage", http.StatusFound)
+}
+
 
 /* Gloabl templates variable
   - Call ParseFiles once at program initialization, parsing all templates into a single *Template
@@ -102,7 +106,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
     - Panic is appropriate here if template can't be loaded, so it will exit the program
   - ParseFiles can take any number of strings
 */
-var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
+var templates = template.Must(template.ParseFiles("tmpl/edit.html", "tmpl/view.html"))
 
 
 
@@ -126,14 +130,14 @@ var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
 
 // Don't need because we added makeHandler
 /* Function to validate path and extract the page title */
-/* func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
   m := validPath.FindStringSubmatch(r.URL.Path)
   if m == nil {
     http.NotFound(w,r)
     return "", errors.New("Invalid Page Title")
   }
   return m[2], nil // The title is the second subexpression
- } */
+ }
 
 /* Wrapper function that takes a function and returns a function of type http.HandlerFunc
   - returned function called a closure bc it encloses values defined outside of it
@@ -168,6 +172,7 @@ func main() {
 
   // Handler
   // localhost:8080/view/[filename]
+  http.HandleFunc("/", rootHandler)
   http.HandleFunc("/view/", makeHandler(viewHandler))
   http.HandleFunc("/edit/", makeHandler(editHandler))
   http.HandleFunc("/save/", makeHandler(saveHandler))
